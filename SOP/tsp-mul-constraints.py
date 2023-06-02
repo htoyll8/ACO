@@ -33,7 +33,9 @@ class ACO:
 
                 # Construct paths for all ants
                 for i in range(self.ants):
-                    path = [0]  # Start from the first city
+                    # Randomly select the initial city for each ant
+                    initial_city = np.random.randint(num_cities)
+                    path = [initial_city]  # Start from the randomly selected city
                     unvisited = list(range(1, num_cities))  # List of unvisited cities
 
                     # Visit all cities
@@ -122,5 +124,65 @@ constraints = np.array([[[0, 1, 1, 0],
 aco = ACO(ants=2, evaporation_rate=0.1, alpha=1, beta=1, constraints=constraints, iterations=100, output_file='paths.txt')
 aco.fit(distances)
 
+print(f"Best path: {aco.best_path}")
+print(f"Best distance: {aco.best_distance}")
+
+# Define the test instance (distance matrix)
+distances = np.array([[0, 10, 15, 20],
+                      [10, 0, 35, 25],
+                      [15, 35, 0, 30],
+                      [20, 25, 30, 0]])
+
+# Define the conflicting constraints for each ant as a list of matrices
+constraints = [
+    np.array([[0, 1, 1, 0],
+              [1, 0, 0, 1],
+              [0, 1, 0, 1],
+              [1, 0, 1, 0]]),
+    np.array([[0, 1, 0, 1],
+              [1, 0, 1, 0],
+              [0, 1, 0, 1],
+              [1, 0, 1, 0]]),
+    np.array([[1, 0, 1, 0],
+              [0, 1, 1, 0],
+              [1, 1, 0, 1],
+              [0, 0, 1, 0]]),
+    np.array([[0, 1, 0, 1],
+              [1, 0, 1, 0],
+              [0, 1, 0, 1],
+              [1, 0, 1, 0]]),
+    np.array([[0, 0, 1, 0],
+              [0, 0, 1, 0],
+              [1, 1, 0, 1],
+              [0, 0, 1, 0]]),
+    np.array([[0, 1, 1, 0],
+              [1, 0, 1, 0],
+              [0, 1, 0, 1],
+              [1, 0, 1, 0]]),
+    np.array([[1, 0, 1, 0],
+              [0, 1, 1, 0],
+              [1, 1, 0, 1],
+              [0, 0, 1, 0]]),
+    np.array([[0, 0, 1, 0],
+              [0, 0, 1, 0],
+              [1, 1, 0, 1],
+              [0, 0, 1, 0]]),
+    np.array([[0, 1, 1, 0],
+              [1, 0, 1, 0],
+              [0, 1, 0, 1],
+              [1, 0, 1, 0]]),
+    np.array([[1, 0, 1, 0],
+              [0, 1, 1, 0],
+              [1, 1, 0, 1],
+              [0, 0, 1, 0]])
+]
+
+# Create an ACO instance with conflicting constraints
+aco = ACO(ants=10, evaporation_rate=0.1, alpha=1, beta=1, constraints=constraints, iterations=100, output_file='paths.txt')
+
+# Run the ACO algorithm
+aco.fit(distances)
+
+# Print the best path and its distance
 print(f"Best path: {aco.best_path}")
 print(f"Best distance: {aco.best_distance}")
