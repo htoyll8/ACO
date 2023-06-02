@@ -1,21 +1,21 @@
 import numpy as np
 
 class ACO:
-    def __init__(self, ants, evaporation_rate, alpha, beta, iterations):
+    def __init__(self, ants, evaporation_rate, alpha, beta, constraints, iterations, output_file):
         # Initialize parameters
         self.ants = ants  # Number of ants
         self.evaporation_rate = evaporation_rate  # Rate at which pheromone evaporates
         self.alpha = alpha  # Controls the pheromone importance
-        self.beta = beta  # Controls the distance importance\
+        self.beta = beta  # Controls the distance importance
+        self.constraints = constraints  # List of constraint matrices, one for each ant
         self.iterations = iterations  # Number of iterations
+        self.output_file = output_file  # Output file to save the paths
 
-    def fit(self, distances, constraints):
+    def fit(self, distances):
         # Fit the ACO algorithm to the problem
         # distances: Distance matrix
-        # constraints: Constraint matrix
 
         self.distances = distances  # Distance matrix
-        self.constraints = constraints  # Constraint matrix
         num_cities = self.distances.shape[0]  # Number of cities
 
         # Initialize pheromone on each edge with the same amount
@@ -25,38 +25,46 @@ class ACO:
         self.best_path = None
         self.best_distance = float('inf')
 
-        # Iterate the algorithm for a given number of times
-        for _ in range(self.iterations):
-            all_paths = []
+        # Open the output file to save the paths
+        with open(self.output_file, 'w') as f:
+            # Iterate the algorithm for a given number of times
+            for _ in range(self.iterations):
+                all_paths = []
 
-            # Construct paths for all ants
-            for _ in range(self.ants):
-                path = [0]  # Start from the first city
-                unvisited = list(range(1, num_cities))  # List of unvisited cities
+                # Construct paths for all ants
+                for i in range(self.ants):
+                    path = [0]  # Start from the first city
+                    unvisited = list(range(1, num_cities))  # List of unvisited cities
 
-                # Visit all cities
-                while unvisited:
-                    current_city = path[-1]  # Current city
-                    next_city = self.select_next_city(current_city, unvisited)  # Select next city based on pheromone and constraints
-                    path.append(next_city)  # Move to the next city
-                    unvisited.remove(next_city)  # Remove the next city from the list of unvisited cities
+                    # Visit all cities
+                    while unvisited:
+                        current_city = path[-1]  # Current city
+                        next_city = self.select_next_city(current_city, self.constraints[i], unvisited)  # Select next city based on pheromone and constraints
+                        path.append(next_city)  # Move to the next city
+                        unvisited.remove(next_city)  # Remove the next city from the list of unvisited cities
 
-                path.append(0)  # Return to the first city to complete the loop
-                distance = self.get_distance(path)  # Calculate the total distance of the path
+                    path.append(0)  # Return to the first city to complete the loop
+                    distance = self.get_distance(path)  # Calculate the total distance of the path
 
-                # Update the best path and distance if the current path is better
-                if distance < self.best_distance:
-                    self.best_distance = distance
-                    self.best_path = path
+                    # Update the best path and distance if the current path is better
+                    if distance < self.best_distance:
+                        self.best_distance = distance
+                        self.best_path = path
 
-                all_paths.append((path, distance))  # Append the path and distance to the list of all paths
+                    all_paths.append((path, distance))  # Append the path and distance to the list of all paths
 
-            self.update_pheromones(all_paths)  # Update pheromones on all paths
+                self.update_pheromones(all_paths)  # Update pheromones on all paths
 
-    def select_next_city(self, current_city, unvisited):
+                # Save the paths for this iteration into the output file
+                f.write(f"Iteration: {_ + 1}\n")
+                for path, _ in all_paths:
+                    f.write(f"{path}\n")
+                f.write("\n")
+
+    def select_next_city(self, current_city, constraints, unvisited):
         probabilities = []
         for next_city in unvisited:
-            transition_probability = self.pheromone[current_city][next_city] * self.constraints[current_city][next_city]
+            transition_probability = self.pheromone[current_city][next_city] * constraints[current_city][next_city]
             probabilities.append(transition_probability)
 
         if np.sum(probabilities) == 0 or np.isnan(np.sum(probabilities)):
@@ -101,32 +109,18 @@ distances = np.array([[0, 10, 15, 20],
                       [15, 35, 0, 30],
                       [20, 25, 30, 0]])
 
-constraints = np.array([[0, 1, 1, 0],
+constraints = np.array([[[0, 1, 1, 0],
                         [1, 0, 1, 1],
                         [1, 1, 0, 1],
-                        [0, 1, 1, 0]])
+                        [0, 1, 1, 0]],
 
-aco = ACO(ants=10, evaporation_rate=0.1, alpha=1, beta=1, iterations=100)
-aco.fit(distances, constraints)
-
-
-print(f"Best path: {aco.best_path}")
-print(f"Best distance: {aco.best_distance}")
-
-distances = np.array([[0, 10, 15, 20],
-                      [10, 0, 35, 25],
-                      [15, 35, 0, 30],
-                      [20, 25, 30, 0]])
-
-constraints = np.array([[0, 1, 1, 0],
+                       [[0, 1, 0, 1],
                         [1, 0, 0, 1],
                         [0, 1, 0, 1],
-                        [1, 0, 1, 0]])
+                        [1, 0, 1, 0]]])
 
-aco = ACO(ants=10, evaporation_rate=0.1, alpha=1, beta=1, iterations=100)
-aco.fit(distances, constraints)
+aco = ACO(ants=2, evaporation_rate=0.1, alpha=1, beta=1, constraints=constraints, iterations=100, output_file='paths.txt')
+aco.fit(distances)
 
 print(f"Best path: {aco.best_path}")
 print(f"Best distance: {aco.best_distance}")
-
-
