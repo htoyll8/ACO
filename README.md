@@ -1,6 +1,6 @@
 # Ant Colony Optimization (ACO) Implementations for Different Applications
 
-This repository contains a collection of Ant Colony Optimization (ACO) algorithm implementations for various applications, including the Traveling Salesman Problem (TSP) and Sequential Ordering Problem. The implementations focus on exploring the impact of different heuristics and constraints for individual ants in the ACO algorithm.
+This repository contains a collection of Ant Colony Optimization (ACO) algorithm implementations for various applications, including the Traveling Salesman Problem (TSP), Sequential Ordering Problem (SOP), and Program Synthesis. The implementations focus on exploring the impact of different heuristics and constraints for individual ants in the ACO algorithm.
 
 ## Introduction
 
@@ -13,6 +13,8 @@ The repository includes the following ACO implementations for different applicat
 - **Traveling Salesman Problem (TSP):** This implementation focuses on solving the classic TSP, where the objective is to find the shortest possible route that visits all cities and returns to the starting city. The ACO algorithm is modified to allow each ant to have its own set of heuristics and constraints, exploring the emergence of near-optimal solutions that cover even conflicting heuristics and constraints.
 
 - **Sequential Ordering Problem (SOP):** This implementation addresses the sequential ordering problem, which involves arranging a set of elements in a particular order while satisfying certain constraints. The ACO algorithm is enhanced to incorporate multiple heuristics and constraints for individual ants, enabling the exploration of solutions that cater to different trade-offs and preferences, even in the presence of conflicting heuristics and constraints.
+
+- **Program Synthesis:** This implementation focuses on the synthesis of computer programs using the ACO algorithm. It explores the generation of programs through a combination of operators and constants, utilizing pheromone trails to guide the search process. The ACO algorithm is customized to consider the fitness of programs based on their performance in solving a given problem or meeting specific criteria.
 
 Feel free to explore each implementation folder for detailed information, usage instructions, and customization options.
 
