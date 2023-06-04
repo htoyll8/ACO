@@ -54,6 +54,8 @@ class Synthesizer:
         self.ants = ants
         self.iterations = iterations
         self.expected_result = expected_result
+        self.programs_fitness = []  # Instance variable to store programs and their fitness scores
+        self.top_solutions = []
         self.pheromones = {
             '+': 1.0,  # Initial pheromone level for addition
             '-': 1.0,  # Initial pheromone level for subtraction
@@ -64,30 +66,26 @@ class Synthesizer:
             '4' : 1.0,
             '5' : 1.0
         }
-        self.top_solutions = []
 
     def run(self):
         for _ in range(self.iterations):
-            programs_fitness = [] # List to store programs and their fitness scores
             for ant in self.ants:
                 ast = ant.generate_ast(self.pheromones)
                 result = evaluate_program(ast)
                 fitness_score = 1.0 / (abs(result - self.expected_result) + 1)  # Calculate fitness score based on the difference from the expected value, adding 1 to avoid division by zero
-                programs_fitness.append((ast, fitness_score))  # Store the program and its fitness score
+                program_tuple = (ast, fitness_score)
+                if not self.is_duplicate_program(program_tuple):
+                    self.programs_fitness.append(program_tuple)  # Store the program and its fitness score
 
             # Sort the programs by fitness score in descending order
-            programs_fitness.sort(key=lambda x: x[1], reverse=True)
+            self.programs_fitness.sort(key=lambda x: x[1], reverse=True)
+            print("Fitnesses: ", self.programs_fitness)
 
             # Update the top solutions with the current best programs
-            self.top_solutions = [program for program, _ in programs_fitness[:5]]
+            self.top_solutions = [program for program, _ in self.programs_fitness[:10]]
 
-            print("Programs:")
-            for program, fitness_score in programs_fitness:
-                print_program(program)
-                print("Fitness: ", fitness_score)
-
-            # TODO: Update the pheromone levels based on the fitness score
-            self.update_pheromones(programs_fitness)
+            # Update the pheromone levels based on the fitness score
+            self.update_pheromones(self.programs_fitness)
 
     def update_pheromones(self, programs_fitness):
         for program, fitness_score in programs_fitness:
@@ -95,6 +93,23 @@ class Synthesizer:
                 self.pheromones[program.value] += fitness_score
                 for child in program.children:
                     self.pheromones[str(child.value)] += fitness_score
+    
+    def is_duplicate_program(self, program_tuple):
+        ast, _ = program_tuple
+        for existing_ast, _ in self.programs_fitness:
+            if self.are_programs_equal(ast, existing_ast):
+                return True
+        return False
+
+    def are_programs_equal(self, ast1, ast2):
+        if ast1.value != ast2.value:
+            return False
+        if len(ast1.children) != len(ast2.children):
+            return False
+        for child1, child2 in zip(ast1.children, ast2.children):
+            if not self.are_programs_equal(child1, child2):
+                return False
+        return True
 
 # Function to print the program in tree format
 def print_program(node):
@@ -134,3 +149,6 @@ ant3 = Ant()
 
 synthesizer = Synthesizer([ant1, ant2, ant3], 4, iterations=100)
 synthesizer.run()
+
+for program in synthesizer.top_solutions:
+    print_program(program)
