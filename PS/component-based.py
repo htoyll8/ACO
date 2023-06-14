@@ -1,3 +1,5 @@
+import inspect
+
 class PetriNet:
     def __init__(self):
         """
@@ -82,3 +84,34 @@ def construct_petri(components):
         petri_net.add_edge(component, output)  # Add an edge from the component to the output type
 
     return petri_net
+
+def get_inputs(component):
+    """
+    Extracts the input types from the given component.
+
+    Args:
+        component (function): Component representing a function from the API.
+
+    Returns:
+        dict: Dictionary mapping input types to a list of arguments of that type.
+    """
+    inputs = {}
+    
+    # Extract the input types from the component's signature
+    signature = inspect.signature(component)
+    parameters = signature.parameters.values()
+
+    for parameter in parameters:
+        input_type = parameter.annotation
+        
+        # Skip parameters with no annotation
+        if input_type is inspect.Parameter.empty:
+            continue
+        
+        # Add the parameter to the corresponding input type
+        if input_type in inputs:
+            inputs[input_type].append(parameter.name)
+        else:
+            inputs[input_type] = [parameter.name]
+    
+    return inputs
