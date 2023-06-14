@@ -57,3 +57,28 @@ class PetriNet:
             dict: A dictionary mapping place names to their token counts.
         """
         return self.places.copy()  # Returns a copy of the dictionary containing the place names and token counts
+
+def construct_petri(components):
+    """
+    Constructs a Petri net based on the given components.
+
+    Args:
+        components (list): List of components.
+
+    Returns:
+        PetriNet: Constructed Petri net.
+    """
+    petri_net = PetriNet()  # Create an empty Petri net
+
+    for component in components:
+        inputs = get_inputs(component)  # Get the input types for the component
+        output = get_output(component)  # Get the output type for the component
+
+        for input_type in inputs:
+            petri_net.add_place(input_type)  # Add a place for each input type
+            petri_net.add_edge(input_type, component, weight=len(inputs[input_type]))  # Add an edge from the input type to the component
+
+        petri_net.add_transition(component)  # Add a transition for the component
+        petri_net.add_edge(component, output)  # Add an edge from the component to the output type
+
+    return petri_net
