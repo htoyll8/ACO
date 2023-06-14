@@ -115,3 +115,25 @@ def get_inputs(component):
             inputs[input_type] = [parameter.name]
     
     return inputs
+
+def get_outputs(component):
+    """
+    Get the output type of a component.
+
+    Args:
+        component: The component to inspect.
+
+    Returns:
+        The output type of the component, or None if not found.
+    """
+    output_type = None
+
+    # Check if the component is a function or method
+    if inspect.isfunction(component) or inspect.ismethod(component):
+        signature = inspect.signature(component)
+        return_type = signature.return_annotation
+        if return_type != inspect.Signature.empty:
+            output_type = return_type
+
+    return output_type
+
