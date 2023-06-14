@@ -74,7 +74,7 @@ def construct_petri(components):
 
     for component in components:
         inputs = get_inputs(component)  # Get the input types for the component
-        output = get_output(component)  # Get the output type for the component
+        output = get_outputs(component)  # Get the output type for the component
 
         for input_type in inputs:
             petri_net.add_place(input_type)  # Add a place for each input type
@@ -108,11 +108,14 @@ def get_inputs(component):
         if input_type is inspect.Parameter.empty:
             continue
         
+        # Convert the input_type to its string representation
+        input_type_str = input_type.__name__
+        
         # Add the parameter to the corresponding input type
-        if input_type in inputs:
-            inputs[input_type].append(parameter.name)
+        if input_type_str in inputs:
+            inputs[input_type_str].append(parameter.name)
         else:
-            inputs[input_type] = [parameter.name]
+            inputs[input_type_str] = [parameter.name]
     
     return inputs
 
@@ -137,3 +140,73 @@ def get_outputs(component):
 
     return output_type
 
+# Test cases
+
+def test_petri_net():
+    # Create a Petri net
+    petri_net = PetriNet()
+
+    # Add places
+    petri_net.add_place("P1")
+    petri_net.add_place("P2")
+
+    # Add transitions
+    petri_net.add_transition("T1")
+    petri_net.add_transition("T2")
+
+    # Add edges
+    petri_net.add_edge("P1", "T1", weight=1)
+    petri_net.add_edge("P1", "T2", weight=2)
+    petri_net.add_edge("P2", "T2", weight=1)
+
+    # Check initial marking
+    assert petri_net.get_marking() == {"P1": 0, "P2": 0}
+
+    # Execute transitions
+    petri_net.execute_transition("T1")
+    petri_net.execute_transition("T2")
+
+    # Check updated marking
+    assert petri_net.get_marking() == {"P1": -3, "P2": -1}
+
+    print("All tests passed!")
+
+
+def test_get_inputs():
+    # Define a sample component
+    def sample_component(x: int, y: str, z: float):
+        pass
+
+    # Get the inputs of the sample component
+    inputs = get_inputs(sample_component)
+
+    # Expected inputs: {'int': ['x'], 'str': ['y'], 'float': ['z']}
+    expected_inputs = {'int': ['x'], 'str': ['y'], 'float': ['z']}
+
+    # Compare the actual and expected inputs
+    assert inputs == expected_inputs, "Test case failed"
+
+    print("All tests passed!")
+
+
+def test_get_outputs():
+    def add(a: int, b: int) -> int:
+        return a + b
+
+    def multiply(a: float, b: float) -> float:
+        return a * b
+
+    def no_return_type(a: str):
+        return len(a)
+
+    assert get_outputs(add) == int
+    assert get_outputs(multiply) == float
+    assert get_outputs(no_return_type) is None
+
+    print("All tests passed!")
+
+
+# Run the test function
+test_petri_net()
+test_get_inputs()
+test_get_outputs()
