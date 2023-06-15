@@ -60,12 +60,13 @@ class PetriNet:
         """
         return self.places.copy()  # Returns a copy of the dictionary containing the place names and token counts
 
-def construct_petri(components):
+def construct_petri(components, user_provided_signature):
     """
     Constructs a Petri net based on the given components.
 
     Args:
         components (list): List of components.
+        user_provided_signature (dict): User-provided signature mapping parameter names to types.
 
     Returns:
         PetriNet: Constructed Petri net.
@@ -76,11 +77,18 @@ def construct_petri(components):
         inputs = get_inputs(component)  # Get the input types for the component
         output = get_outputs(component)  # Get the output type for the component
 
+        petri_net.add_transition(component)  # Add a transition for the component
+
         for input_type in inputs:
-            petri_net.add_place(input_type)  # Add a place for each input type
+            if input_type not in petri_net.places:
+                petri_net.add_place(input_type)  # Add the place if it doesn't exist already
+            
+                if input_type in user_provided_signature.values():
+                    count = sum(1 for t in user_provided_signature.values() if t == input_type)
+                    petri_net.places[input_type] += count  # Increment the token count of the place by the count
+
             petri_net.add_edge(input_type, component, weight=len(inputs[input_type]))  # Add an edge from the input type to the component
 
-        petri_net.add_transition(component)  # Add a transition for the component
         petri_net.add_edge(component, output)  # Add an edge from the component to the output type
 
     return petri_net
@@ -171,6 +179,25 @@ def test_petri_net():
 
     print("All tests passed!")
 
+def test_construct_petri():
+    def example_function(x: int, y: str, z: float) -> None:
+        pass
+
+    components = [example_function]  # Example list of components
+    signature = inspect.signature(example_function)  # Example function signature
+    
+    petri_net = construct_petri(components, signature)
+    
+    # Verify the places and their initial markings
+    expected_marking = {
+        int: 1,
+        str: 1,
+        float: 1,
+        None.__class__: 1
+    }
+    assert petri_net.get_marking() == expected_marking
+    
+    print("All test cases passed!")
 
 def test_get_inputs():
     # Define a sample component
@@ -208,5 +235,6 @@ def test_get_outputs():
 
 # Run the test function
 test_petri_net()
+test_construct_petri()
 test_get_inputs()
 test_get_outputs()
