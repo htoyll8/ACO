@@ -66,12 +66,15 @@ def construct_petri(components, user_provided_signature):
 
     Args:
         components (list): List of components.
-        user_provided_signature (dict): User-provided signature mapping parameter names to types.
+        user_provided_signature (function): User-provided signature as a Python function.
 
     Returns:
         PetriNet: Constructed Petri net.
     """
     petri_net = PetriNet()  # Create an empty Petri net
+
+    signature = inspect.signature(user_provided_signature)
+    parameters = signature.parameters.values()
 
     for component in components:
         inputs = get_inputs(component)  # Get the input types for the component
@@ -83,9 +86,9 @@ def construct_petri(components, user_provided_signature):
             if input_type not in petri_net.places:
                 petri_net.add_place(input_type)  # Add the place if it doesn't exist already
             
-                if input_type in user_provided_signature.values():
-                    count = sum(1 for t in user_provided_signature.values() if t == input_type)
-                    petri_net.places[input_type] += count  # Increment the token count of the place by the count
+            if any(param.annotation == input_type for param in parameters):
+                count = sum(1 for param in parameters if param.annotation == input_type)
+                petri_net.places[input_type] += count  # Increment the token count of the place by the count
 
             petri_net.add_edge(input_type, component, weight=len(inputs[input_type]))  # Add an edge from the input type to the component
 
@@ -184,9 +187,8 @@ def test_construct_petri():
         pass
 
     components = [example_function]  # Example list of components
-    signature = inspect.signature(example_function)  # Example function signature
     
-    petri_net = construct_petri(components, signature)
+    petri_net = construct_petri(components, example_function)
     
     # Verify the places and their initial markings
     expected_marking = {
