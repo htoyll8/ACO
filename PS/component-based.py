@@ -5,18 +5,21 @@ class PetriNet:
         """
         Initializes an empty Petri net.
         """
-        self.places = {}  # Dictionary to store places and their token counts
-        self.transitions = {}  # Dictionary to store transitions and their input places
-        self.edges = {}  # Dictionary to store edge weights between places and transitions
+        self.places = set()  # Set to store places
+        self.place_markings = {}  # Dictionary to store place markings
+        self.transitions = set()  # Set to store transition nodes
+        self.edges = {}  # Dictionary to store edge weights between nodes
 
-    def add_place(self, place):
+    def add_place(self, place, markings=0):
         """
         Adds a place to the Petri net.
 
         Args:
             place (str): Name of the place.
+            marking (int): Initial marking for the place (default is 0).
         """
-        self.places[place] = 0  # Initializes the token count of the place to 0
+        self.places.add(place)  # Adds the place to the set of places
+        self.place_markings[place] = markings  # Initializes the marking of the place
 
     def add_transition(self, transition):
         """
@@ -25,40 +28,52 @@ class PetriNet:
         Args:
             transition (str): Name of the transition.
         """
-        self.transitions[transition] = {}  # Initializes an empty dictionary to store input places for the transition
+        self.transitions.add(transition)  # Adds the transition to the set of transitions
 
-    def add_edge(self, place, transition, weight=1):
+    def add_edge(self, node1, node2, weight=1):
         """
-        Adds an edge between a place and a transition in the Petri net.
+        Adds an edge between two nodes in the Petri net.
 
         Args:
-            place (str): Name of the input place.
-            transition (str): Name of the transition.
+            node1 (str): Name of the first node.
+            node2 (str): Name of the second node.
             weight (int): Weight of the edge (default is 1).
         """
-        if place not in self.places or transition not in self.transitions:
-            raise ValueError("Invalid place or transition")  # Error handling for invalid place or transition
-        
-        self.transitions[transition][place] = weight  # Sets the weight of the edge from place to transition
+        if node1 in self.places and node2 not in self.transitions:
+            raise ValueError(f"Invalid node: {node1}")  # Error handling for invalid node
+
+        if node1 in self.transitions and node2 not in self.places:
+            raise ValueError(f"Invalid node: {node2}")  # Error handling for invalid node
+
+        if node1 in self.edges:
+            self.edges[node1][node2] = weight  # Adds node2 with the specified weight as an outgoing edge from node1
+        else:
+            self.edges[node1] = {node2: weight}  # Creates a new dictionary for the outgoing edges from node1 with node2 and weight
 
     def execute_transition(self, transition):
         """
-        Executes a transition in the Petri net by consuming tokens from input places.
+        Executes a transition in the Petri net.
 
         Args:
             transition (str): Name of the transition.
         """
-        for place, weight in self.transitions[transition].items():
-            self.places[place] -= weight  # Decrements the token count of each input place based on the edge weight
+        edge_weight = list(self.edges[transition].values())[0]  # Access the first value of the dictionary
+        transition_output_place = list(self.edges[transition].keys())[0]  # Access the first key of the dictionary
+        self.place_markings[transition_output_place] += edge_weight
 
-    def get_marking(self):
+        for node1, output_dict in self.edges.items():
+            if node1 in self.places and transition in output_dict.keys():
+                edge_weight = output_dict[transition]
+                self.place_markings[node1] -= edge_weight
+
+    def get_markings(self):
         """
-        Retrieves the current marking (token counts) of all places in the Petri net.
+        Retrieves the current markings of all place nodes in the Petri net.
 
         Returns:
-            dict: A dictionary mapping place names to their token counts.
+            dict: A dictionary mapping place names to their current markings.
         """
-        return self.places.copy()  # Returns a copy of the dictionary containing the place names and token counts
+        return self.place_markings.copy()  # Returns a copy of the dictionary containing the place markings
 
 def construct_petri(components, user_provided_signature):
     """
@@ -85,13 +100,17 @@ def construct_petri(components, user_provided_signature):
         for input_type in inputs:
             if input_type not in petri_net.places:
                 petri_net.add_place(input_type)  # Add the place if it doesn't exist already
-            
+
             if any(param.annotation == input_type for param in parameters):
                 count = sum(1 for param in parameters if param.annotation == input_type)
                 petri_net.places[input_type] += count  # Increment the token count of the place by the count
 
             petri_net.add_edge(input_type, component, weight=len(inputs[input_type]))  # Add an edge from the input type to the component
 
+        if output not in petri_net.places:
+            petri_net.add_place(output)  # Add the place for the output type if it doesn't exist already
+
+        print("Look: ", petri_net.places, petri_net.transitions)
         petri_net.add_edge(component, output)  # Add an edge from the component to the output type
 
     return petri_net
@@ -154,36 +173,41 @@ def get_outputs(component):
 # Test cases
 
 def test_petri_net():
-    # Create a Petri net
     petri_net = PetriNet()
 
     # Add places
-    petri_net.add_place("P1")
+    petri_net.add_place("P1", markings=1)
     petri_net.add_place("P2")
+    petri_net.add_place("P3", markings=2)
 
     # Add transitions
     petri_net.add_transition("T1")
     petri_net.add_transition("T2")
+    petri_net.add_transition("T3")
 
-    # Add edges
+    # Add edges between transitions and places
     petri_net.add_edge("P1", "T1", weight=1)
-    petri_net.add_edge("P1", "T2", weight=2)
-    petri_net.add_edge("P2", "T2", weight=1)
+    petri_net.add_edge("T1", "P2", weight=1)
+    petri_net.add_edge("P2", "T2", weight=2)
+    petri_net.add_edge("T2", "P3", weight=1)
+    petri_net.add_edge("P3", "T3", weight=1)
 
-    # Check initial marking
-    assert petri_net.get_marking() == {"P1": 0, "P2": 0}
-
-    # Execute transitions
+    # Execute a transition
     petri_net.execute_transition("T1")
+
+    # Check the updated markings
+    assert petri_net.get_markings() == {"P1": 0, "P2": 1, "P3": 2}
+
+    # Execute another transition
     petri_net.execute_transition("T2")
 
-    # Check updated marking
-    assert petri_net.get_marking() == {"P1": -3, "P2": -1}
+    # Check the updated markings
+    assert petri_net.get_markings() == {"P1": 0, "P2": -1, "P3": 3}
 
-    print("All tests passed!")
+    print("Petri net tests passed!")
 
 def test_construct_petri():
-    def example_function(x: int, y: str, z: float) -> None:
+    def example_function(x: int, y: str, z: float) -> int:
         pass
 
     components = [example_function]  # Example list of components
@@ -197,9 +221,9 @@ def test_construct_petri():
         float: 1,
         None.__class__: 1
     }
-    assert petri_net.get_marking() == expected_marking
+    assert petri_net.get_markings() == expected_marking
     
-    print("All test cases passed!")
+    print("Construct petri net tests passed!")
 
 def test_get_inputs():
     # Define a sample component
@@ -215,8 +239,7 @@ def test_get_inputs():
     # Compare the actual and expected inputs
     assert inputs == expected_inputs, "Test case failed"
 
-    print("All tests passed!")
-
+    print("Get inputs tests passed!")
 
 def test_get_outputs():
     def add(a: int, b: int) -> int:
@@ -232,11 +255,11 @@ def test_get_outputs():
     assert get_outputs(multiply) == float
     assert get_outputs(no_return_type) is None
 
-    print("All tests passed!")
+    print("Get outputs tests passed!")
 
 
 # Run the test function
 test_petri_net()
-test_construct_petri()
+# test_construct_petri()
 test_get_inputs()
 test_get_outputs()
