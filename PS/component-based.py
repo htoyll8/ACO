@@ -175,6 +175,30 @@ def get_outputs(component):
 
     return output_type
 
+# Reachbility graph.
+
+class ReachabilityGraph:
+    def __init__(self):
+        self.nodes = set()
+        self.edges = set()
+
+def construct_reachability_graph(petri_net, desired_output_type):
+    reachability_graph = ReachabilityGraph()
+    worklist = {petri_net.initial_marking}
+
+    while worklist:
+        current_marking = worklist.pop()
+        reachability_graph.nodes.add(current_marking)
+
+        for transition in petri_net.enabled_transitions(current_marking):
+            successor_marking = petri_net.fire_transition(current_marking, transition)
+            reachability_graph.edges.add((current_marking, transition, successor_marking))
+
+            if successor_marking not in reachability_graph.nodes:
+                worklist.add(successor_marking)
+
+    return reachability_graph
+
 # Test cases
 
 def test_petri_net():
