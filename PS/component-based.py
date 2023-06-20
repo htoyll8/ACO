@@ -5,7 +5,7 @@ class PetriNet:
         """
         Initializes an empty Petri net.
         """
-        self.places = set()  # Set to store places
+        self.places = set()  # Dictionary to store places and their token counts
         self.place_markings = {}  # Dictionary to store place markings
         self.transitions = set()  # Set to store transition nodes
         self.edges = {}  # Dictionary to store edge weights between nodes
@@ -89,7 +89,13 @@ def construct_petri(components, user_provided_signature):
     petri_net = PetriNet()  # Create an empty Petri net
 
     signature = inspect.signature(user_provided_signature)
-    parameters = signature.parameters.values()
+    parameters = {}
+    for param in signature.parameters.values():
+        param_name = param.name
+        param_type = param.annotation.__name__
+        if param_type not in parameters:
+            parameters[param_type] = []
+        parameters[param_type].append(param_name)
 
     for component in components:
         inputs = get_inputs(component)  # Get the input types for the component
@@ -101,16 +107,15 @@ def construct_petri(components, user_provided_signature):
             if input_type not in petri_net.places:
                 petri_net.add_place(input_type)  # Add the place if it doesn't exist already
 
-            if any(param.annotation == input_type for param in parameters):
-                count = sum(1 for param in parameters if param.annotation == input_type)
-                petri_net.places[input_type] += count  # Increment the token count of the place by the count
+                if input_type in parameters:
+                    count = len(parameters[input_type])
+                    petri_net.place_markings[input_type] += count  # Increment the token count of the place by the count
 
             petri_net.add_edge(input_type, component, weight=len(inputs[input_type]))  # Add an edge from the input type to the component
 
         if output not in petri_net.places:
             petri_net.add_place(output)  # Add the place for the output type if it doesn't exist already
 
-        print("Look: ", petri_net.places, petri_net.transitions)
         petri_net.add_edge(component, output)  # Add an edge from the component to the output type
 
     return petri_net
@@ -157,16 +162,16 @@ def get_outputs(component):
         component: The component to inspect.
 
     Returns:
-        The output type of the component, or None if not found.
+        The output type name of the component, or None if not found.
     """
-    output_type = None
+    output_type = "None"
 
     # Check if the component is a function or method
     if inspect.isfunction(component) or inspect.ismethod(component):
         signature = inspect.signature(component)
         return_type = signature.return_annotation
         if return_type != inspect.Signature.empty:
-            output_type = return_type
+            output_type = return_type.__name__
 
     return output_type
 
@@ -204,7 +209,7 @@ def test_petri_net():
     # Check the updated markings
     assert petri_net.get_markings() == {"P1": 0, "P2": -1, "P3": 3}
 
-    print("Petri net tests passed!")
+    print("\u2705 Petri net tests passed!")
 
 def test_construct_petri():
     def example_function(x: int, y: str, z: float) -> int:
@@ -216,14 +221,15 @@ def test_construct_petri():
     
     # Verify the places and their initial markings
     expected_marking = {
-        int: 1,
-        str: 1,
-        float: 1,
-        None.__class__: 1
+        'int': 1,
+        'str': 1,
+        'float': 1,
     }
+
+    # Check the initial markings
     assert petri_net.get_markings() == expected_marking
     
-    print("Construct petri net tests passed!")
+    print("\u2705 Construct petri net tests passed!")
 
 def test_get_inputs():
     # Define a sample component
@@ -239,7 +245,7 @@ def test_get_inputs():
     # Compare the actual and expected inputs
     assert inputs == expected_inputs, "Test case failed"
 
-    print("Get inputs tests passed!")
+    print("\u2705 Get inputs tests passed!")
 
 def test_get_outputs():
     def add(a: int, b: int) -> int:
@@ -251,15 +257,14 @@ def test_get_outputs():
     def no_return_type(a: str):
         return len(a)
 
-    assert get_outputs(add) == int
-    assert get_outputs(multiply) == float
-    assert get_outputs(no_return_type) is None
-
-    print("Get outputs tests passed!")
+    assert get_outputs(add) == 'int'
+    assert get_outputs(multiply) == 'float'
+    assert get_outputs(no_return_type) == 'None'
+    print("\u2705 Get outputs tests passed!")
 
 
 # Run the test function
 test_petri_net()
-# test_construct_petri()
+test_construct_petri()
 test_get_inputs()
 test_get_outputs()
