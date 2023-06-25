@@ -80,7 +80,6 @@ class PetriNet:
         # Consume tokens from input places
         for input_place in inputs:
             edge_weight = self.edges[input_place][transition]
-            print("Consuming: ", edge_weight)
             # Add tokens to the output place
             updated_place_markings[output_place] += updated_place_markings[input_place]
             updated_place_markings[input_place] -= edge_weight
@@ -222,7 +221,15 @@ def get_outputs(component):
 class ReachabilityGraph:
     def __init__(self):
         self.nodes = set()
-        self.edges = set()
+        self.edges = {}
+
+    def add_node(self, node):
+        self.nodes.add(tuple(node.items()))
+
+    def add_edge(self, source, transition, destination):
+        if source not in self.edges:
+            self.edges[source] = {}
+        self.edges[source][transition] = destination
 
 def construct_reachability_graph(petri_net):
     reachability_graph = ReachabilityGraph()
@@ -231,13 +238,20 @@ def construct_reachability_graph(petri_net):
 
     while worklist:
         current_markings = worklist.popleft()
-        print("Popped: ", current_markings)
-        reachability_graph.nodes.add(tuple(current_markings.items()))
+        current_markings_tuple = tuple(current_markings.items())
+        reachability_graph.add_node(current_markings)
 
         enabled_transitions = petri_net.enabled_edges(current_markings)
         for transition in enabled_transitions:
-            print("Transition: ", transition)
             successor_markings = petri_net.execute_transition(transition, current_markings)
+            successor_markings_tuple = tuple(successor_markings.items())
+
+            reachability_graph.add_node(successor_markings)
+            reachability_graph.add_edge(current_markings_tuple, transition, successor_markings_tuple)
+
+            worklist.append(successor_markings)
+
+    return reachability_graph
 
 # Test cases
 
@@ -264,8 +278,6 @@ def test_execute_transition():
 
     # Check the updated markings
     expected_markings = {"P1": 0, "P2": 3, "P3": 0}
-    print("Initial markings: ", initial_markings)
-    print("Updated markings: ", updated_markings)
 
     assert updated_markings == expected_markings
 
@@ -291,8 +303,6 @@ def test_execute_transition():
     # Check the updated markings
     expected_markings = {"P1": 0, "P2": 4, "P3": 0}
 
-    print("Initial markings: ", initial_markings)
-    print("Updated markings: ", updated_markings)
     assert updated_markings == expected_markings
 
     print("\u2705 Execute transitions tests passed!")
@@ -348,6 +358,38 @@ def test_get_outputs():
     assert get_outputs(no_return_type) == 'None'
     print("\u2705 Get outputs tests passed!")
 
+def test_enabled_edges():
+    petri_net = PetriNet()
+
+    # Add places
+    petri_net.add_place("P1", markings=2)
+    petri_net.add_place("P2", markings=1)
+    petri_net.add_place("P3")
+
+    # Add transitions
+    petri_net.add_transition("T1")
+    petri_net.add_transition("T2")
+    petri_net.add_transition("T3")
+
+
+    # Add edges
+    petri_net.add_edge("P1", "T1", weight=2)
+    petri_net.add_edge("P2", "T1", weight=1)
+    petri_net.add_edge("P2", "T2", weight=1)
+    petri_net.add_edge("P3", "T3", weight=2)
+
+    # Set place markings
+    place_markings = {"P1": 2, "P2": 1, "P3": 0}
+
+    # Get enabled edges
+    enabled_edges = petri_net.enabled_edges(place_markings)
+
+    # Check the enabled edges
+    expected_enabled_edges = ["T1", "T2"]
+    assert enabled_edges == expected_enabled_edges
+
+    print("\u2705 Enabled edges tests passed!")
+
 def test_construct_reachability_graph():
     # Create a Petri net
     petri_net = PetriNet()
@@ -367,18 +409,31 @@ def test_construct_reachability_graph():
     petri_net.add_edge("P2", "T2")
     petri_net.add_edge("T2", "P3")
 
-    print("Edges: ", petri_net.edges)
-
     # Set the desired output type
     desired_output_type = int
 
     # Construct the reachability graph
     reachability_graph = construct_reachability_graph(petri_net)
 
+    # Verify the correctness of the reachability graph
+    assert len(reachability_graph.nodes) == 3  # Expected node count
+    assert len(reachability_graph.edges) == 2  # Expected edge count
+
+    expected_nodes = [
+        {"P1": 1, "P2": 0, "P3": 0},
+        {"P1": 0, "P2": 1, "P3": 0},
+        {"P1": 0, "P2": 0, "P3": 1}
+    ]
+
+    for node in expected_nodes:
+        assert tuple(node.items()) in reachability_graph.nodes  # Check if the node exists in the reachability graph
+
+    print("\u2705 Construct reachability graph tests passed!")
 
 # Run the test function
 test_execute_transition()
 test_construct_petri()
 test_get_inputs()
 test_get_outputs()
+test_enabled_edges()
 test_construct_reachability_graph()
