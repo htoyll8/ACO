@@ -1,4 +1,5 @@
 import inspect
+from collections import deque
 
 class PetriNet:
     def __init__(self):
@@ -50,21 +51,62 @@ class PetriNet:
         else:
             self.edges[node1] = {node2: weight}  # Creates a new dictionary for the outgoing edges from node1 with node2 and weight
 
-    def execute_transition(self, transition):
+    def execute_transition(self, transition, place_markings):
         """
         Executes a transition in the Petri net.
 
         Args:
             transition (str): Name of the transition.
-        """
-        edge_weight = list(self.edges[transition].values())[0]  # Access the first value of the dictionary
-        transition_output_place = list(self.edges[transition].keys())[0]  # Access the first key of the dictionary
-        self.place_markings[transition_output_place] += edge_weight
+            place_markings (dict): Dictionary mapping place names to their markings.
 
-        for node1, output_dict in self.edges.items():
-            if node1 in self.places and transition in output_dict.keys():
-                edge_weight = output_dict[transition]
-                self.place_markings[node1] -= edge_weight
+        Returns:
+            dict: Updated place markings after executing the transition.
+        """
+        # Create a copy of the place markings
+        updated_place_markings = place_markings.copy()
+
+        # Find all of the inputs to the transition
+        inputs = [place for place, edges in self.edges.items() if edges.get(transition) is not None]
+
+        # Check if each input place has enough markings
+        for input_place in inputs:
+            edge_weight = self.edges[input_place][transition]
+            if updated_place_markings[input_place] < edge_weight:
+                raise ValueError(f"Not enough tokens in place {input_place} to fire transition {transition}.")
+
+        # 
+        output_place = next(iter(self.edges[transition].keys()))
+
+        # Consume tokens from input places
+        for input_place in inputs:
+            edge_weight = self.edges[input_place][transition]
+            print("Consuming: ", edge_weight)
+            # Add tokens to the output place
+            updated_place_markings[output_place] += updated_place_markings[input_place]
+            updated_place_markings[input_place] -= edge_weight
+        
+        return updated_place_markings
+
+    def enabled_edges(self, place_markings):
+        """
+        Returns a list of enabled transitions based on the given place.
+
+        Args:
+            place (str): Name of the place.
+            place_marking (int): Marking of the place.
+
+        Returns:
+            list: List of enabled edges.
+        """
+        enabled_edges = []
+
+        for place, marking in place_markings.items():
+            if marking != 0 and place in self.edges:
+                for destination_node, weight in self.edges[place].items():
+                    if marking >= weight and destination_node not in enabled_edges:
+                        enabled_edges.append(destination_node)
+
+        return enabled_edges
 
     def get_markings(self):
         """
@@ -182,58 +224,78 @@ class ReachabilityGraph:
         self.nodes = set()
         self.edges = set()
 
-def construct_reachability_graph(petri_net, desired_output_type):
+def construct_reachability_graph(petri_net):
     reachability_graph = ReachabilityGraph()
-    worklist = {petri_net.initial_marking}
+    initial_markings = petri_net.place_markings.copy()
+    worklist = deque([initial_markings])
 
     while worklist:
-        current_marking = worklist.pop()
-        reachability_graph.nodes.add(current_marking)
+        current_markings = worklist.popleft()
+        print("Popped: ", current_markings)
+        reachability_graph.nodes.add(tuple(current_markings.items()))
 
-        for transition in petri_net.enabled_transitions(current_marking):
-            successor_marking = petri_net.fire_transition(current_marking, transition)
-            reachability_graph.edges.add((current_marking, transition, successor_marking))
-
-            if successor_marking not in reachability_graph.nodes:
-                worklist.add(successor_marking)
-
-    return reachability_graph
+        enabled_transitions = petri_net.enabled_edges(current_markings)
+        for transition in enabled_transitions:
+            print("Transition: ", transition)
+            successor_markings = petri_net.execute_transition(transition, current_markings)
 
 # Test cases
 
-def test_petri_net():
+def test_execute_transition():
     petri_net = PetriNet()
 
     # Add places
-    petri_net.add_place("P1", markings=1)
-    petri_net.add_place("P2")
-    petri_net.add_place("P3", markings=2)
+    petri_net.add_place("P1", markings=2)
+    petri_net.add_place("P2", markings=1)
+    petri_net.add_place("P3")
 
     # Add transitions
     petri_net.add_transition("T1")
-    petri_net.add_transition("T2")
-    petri_net.add_transition("T3")
 
-    # Add edges between transitions and places
-    petri_net.add_edge("P1", "T1", weight=1)
+    # Add edges
+    petri_net.add_edge("P1", "T1", weight=2)
     petri_net.add_edge("T1", "P2", weight=1)
-    petri_net.add_edge("P2", "T2", weight=2)
-    petri_net.add_edge("T2", "P3", weight=1)
-    petri_net.add_edge("P3", "T3", weight=1)
 
-    # Execute a transition
-    petri_net.execute_transition("T1")
+    # Set initial markings
+    initial_markings = {"P1": 2, "P2": 1, "P3": 0}
 
-    # Check the updated markings
-    assert petri_net.get_markings() == {"P1": 0, "P2": 1, "P3": 2}
-
-    # Execute another transition
-    petri_net.execute_transition("T2")
+    # Execute the transition
+    updated_markings = petri_net.execute_transition("T1", initial_markings)
 
     # Check the updated markings
-    assert petri_net.get_markings() == {"P1": 0, "P2": -1, "P3": 3}
+    expected_markings = {"P1": 0, "P2": 3, "P3": 0}
+    print("Initial markings: ", initial_markings)
+    print("Updated markings: ", updated_markings)
 
-    print("\u2705 Petri net tests passed!")
+    assert updated_markings == expected_markings
+
+    # Add places
+    petri_net.add_place("P1", markings=2)
+    petri_net.add_place("P2", markings=1)
+    petri_net.add_place("P3", markings=1)
+
+    # Add transitions
+    petri_net.add_transition("T1")
+
+    # Add edges
+    petri_net.add_edge("P1", "T1", weight=2)
+    petri_net.add_edge("P3", "T1", weight=1)
+    petri_net.add_edge("T1", "P2", weight=1)
+
+    # Set initial markings
+    initial_markings = {"P1": 2, "P2": 1, "P3": 1}
+
+    # Execute the transition
+    updated_markings = petri_net.execute_transition("T1", initial_markings)
+
+    # Check the updated markings
+    expected_markings = {"P1": 0, "P2": 4, "P3": 0}
+
+    print("Initial markings: ", initial_markings)
+    print("Updated markings: ", updated_markings)
+    assert updated_markings == expected_markings
+
+    print("\u2705 Execute transitions tests passed!")
 
 def test_construct_petri():
     def example_function(x: int, y: str, z: float) -> int:
@@ -286,9 +348,37 @@ def test_get_outputs():
     assert get_outputs(no_return_type) == 'None'
     print("\u2705 Get outputs tests passed!")
 
+def test_construct_reachability_graph():
+    # Create a Petri net
+    petri_net = PetriNet()
+
+    # Add places to the Petri net
+    petri_net.add_place("P1", markings=1)
+    petri_net.add_place("P2", markings=0)
+    petri_net.add_place("P3", markings=0)
+
+    # Add transitions to the Petri net
+    petri_net.add_transition("T1")
+    petri_net.add_transition("T2")
+
+    # Add edges between nodes in the Petri net
+    petri_net.add_edge("P1", "T1")
+    petri_net.add_edge("T1", "P2")
+    petri_net.add_edge("P2", "T2")
+    petri_net.add_edge("T2", "P3")
+
+    print("Edges: ", petri_net.edges)
+
+    # Set the desired output type
+    desired_output_type = int
+
+    # Construct the reachability graph
+    reachability_graph = construct_reachability_graph(petri_net)
+
 
 # Run the test function
-test_petri_net()
+test_execute_transition()
 test_construct_petri()
 test_get_inputs()
 test_get_outputs()
+test_construct_reachability_graph()
