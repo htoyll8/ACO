@@ -253,6 +253,34 @@ def construct_reachability_graph(petri_net):
 
     return reachability_graph
 
+def find_paths(reachability_graph, start_marking, desired_marking):
+    paths = []
+
+    def backtrack(path, current_marking):
+        current_marking = dict(current_marking)  # Convert current_marking to a dictionary
+        print("Comparing: ", current_marking, desired_marking)
+        if current_marking == desired_marking:
+            paths.append(path[:])  # Make a copy of the path before adding it to the list
+            return
+        
+        print("R edges: ", reachability_graph.edges)
+        print("current marking: ", current_marking)
+
+        # Convert current_marking to a tuple if it is a dictionary
+        if isinstance(current_marking, dict):
+            current_marking = tuple(current_marking.items())
+
+        enabled_transitions = reachability_graph.edges.get(current_marking, {})
+        for transition, successor_marking in enabled_transitions.items():
+            print("Transition: ", transition)
+            if successor_marking not in path:
+                path.append(transition)
+                backtrack(path, successor_marking)
+                path.pop()
+
+    backtrack([], start_marking)
+    return paths
+
 # Test cases
 
 def test_execute_transition():
@@ -418,7 +446,8 @@ def test_construct_reachability_graph():
     # Verify the correctness of the reachability graph
     assert len(reachability_graph.nodes) == 3  # Expected node count
     assert len(reachability_graph.edges) == 2  # Expected edge count
-
+    print("Edges: ", reachability_graph.edges)
+ 
     expected_nodes = [
         {"P1": 1, "P2": 0, "P3": 0},
         {"P1": 0, "P2": 1, "P3": 0},
@@ -430,6 +459,41 @@ def test_construct_reachability_graph():
 
     print("\u2705 Construct reachability graph tests passed!")
 
+# Testing the find_paths function
+def test_find_paths():
+    # Create a Petri net
+    petri_net = PetriNet()
+
+    # Add places to the Petri net
+    petri_net.add_place("P1", markings=1)
+    petri_net.add_place("P2", markings=0)
+    petri_net.add_place("P3", markings=0)
+
+    # Add transitions to the Petri net
+    petri_net.add_transition("T1")
+    petri_net.add_transition("T2")
+
+    # Add edges between nodes in the Petri net
+    petri_net.add_edge("P1", "T1")
+    petri_net.add_edge("T1", "P2")
+    petri_net.add_edge("P2", "T2")
+    petri_net.add_edge("T2", "P3")
+
+    # Construct the reachability graph
+    reachability_graph = construct_reachability_graph(petri_net)
+
+    # Test case 1: Find paths from initial marking to {"P1": 0, "P2": 0, "P3": 1}
+    start_marking = {"P1": 1, "P2": 0, "P3": 0}
+    desired_marking = {"P1": 0, "P2": 0, "P3": 1}
+    paths = find_paths(reachability_graph, start_marking, desired_marking)
+    assert len(paths) == 1
+    assert paths[0] == ["T1", "T2"]
+
+    # Test case 2: Find paths from initial marking to {"P1": 0, "P2": 1, "P3": 0}
+    start_marking = {"P1": 1, "P2": 0, "P3": 0}
+    desired_marking = {"P1": 0, "P2": 1, "P3": 0}
+    print("\u2705 Find paths tests passed!")
+
 # Run the test function
 test_execute_transition()
 test_construct_petri()
@@ -437,3 +501,4 @@ test_get_inputs()
 test_get_outputs()
 test_enabled_edges()
 test_construct_reachability_graph()
+test_find_paths()
