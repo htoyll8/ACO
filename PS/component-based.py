@@ -288,6 +288,12 @@ def find_paths(reachability_graph, start_marking, desired_marking):
     backtrack([], start_marking)
     return paths
 
+def pretty_print_edges(edges):
+    print("Edges: ")
+    for marking, transitions in edges.items():
+        print(marking, end=": ")
+        print({transition: successor_marking for transition, successor_marking in transitions.items()})
+
 # Test cases
 
 def test_execute_transition():
@@ -598,6 +604,7 @@ def test_find_paths():
     petri_net.add_transition("Addition")
     petri_net.add_transition("Subtraction")
     petri_net.add_transition("Concat")
+    petri_net.add_transition("EqualityCheck")
 
     # Add edges between nodes in the Petri net
     petri_net.add_edge("int", "Multiplication", weight=2)
@@ -608,11 +615,22 @@ def test_find_paths():
     petri_net.add_edge("Subtraction", "int", weight=1)
     petri_net.add_edge("str", "Concat", weight=2)
     petri_net.add_edge("Concat", "str", weight=1)
+    petri_net.add_edge("int", "EqualityCheck", weight=2)
+    petri_net.add_edge("EqualityCheck", "bool", weight=1)
 
     # Construct the reachability graph
-    print("Constructing graph...")
     reachability_graph = construct_reachability_graph(petri_net)
-    print("Edges: ", reachability_graph.edges)
+    pretty_print_edges(reachability_graph.edges)
+
+    # Test case: Find paths from initial marking to {"int": 0, "str": 0, "bool": 1}
+    start_marking = {"int": 2, "str": 2, "bool": 0}
+    desired_marking = {"int": 0, "str": 0, "bool": 1}
+    paths = find_paths(reachability_graph, start_marking, desired_marking)
+    print("Paths: ", paths)
+    assert len(paths) == 1
+    assert paths[0] == ["Subtraction", "Multiplication", "Concat", "EqualityCheck"]
+
+    print("\u2705 Test case passed!")
 
 # Run the test function
 test_execute_transition()
