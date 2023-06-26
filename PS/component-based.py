@@ -78,10 +78,17 @@ class PetriNet:
 
         # Consume tokens from input places
         for input_place in inputs:
-            edge_weight = self.edges[input_place][transition]
+            print("Edges: ", self.edges)
+            print("Transition: ", transition)
+            print("Input place: ", input_place)
+            input_edge_weight = self.edges[input_place][transition]
+            print(f"{input_place} -> {transition}: ", input_edge_weight)
+            print("Output place: ", output_place)
+            output_edge_weight = self.edges[transition][output_place]
+            print(f"{transition} -> {output_place}: ", output_edge_weight)
             # Add tokens to the output place
-            updated_place_markings[output_place] += updated_place_markings[input_place]
-            updated_place_markings[input_place] -= edge_weight
+            updated_place_markings[input_place] -= input_edge_weight
+            updated_place_markings[output_place] += output_edge_weight
         
         return updated_place_markings
 
@@ -303,9 +310,10 @@ def test_execute_transition():
 
     # Execute the transition
     updated_markings = petri_net.execute_transition("T1", initial_markings)
+    print("Updated markings: ", updated_markings)
 
     # Check the updated markings
-    expected_markings = {"P1": 0, "P2": 3, "P3": 0}
+    expected_markings = {"P1": 0, "P2": 2, "P3": 0}
 
     assert updated_markings == expected_markings
 
@@ -329,7 +337,7 @@ def test_execute_transition():
     updated_markings = petri_net.execute_transition("T1", initial_markings)
 
     # Check the updated markings
-    expected_markings = {"P1": 0, "P2": 4, "P3": 0}
+    expected_markings = {"P1": 0, "P2": 3, "P3": 0}
 
     assert updated_markings == expected_markings
 
