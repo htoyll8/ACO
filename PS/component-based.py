@@ -268,10 +268,10 @@ def construct_reachability_graph(petri_net):
             if k_safety_violation:
                 break
 
-        if k_safety_violation:
-            print("K-safety violation detected!")
-            print("Transitions in combination:", combination)
-            print("Successor markings in combination:", combination_successor_markings)
+        # if k_safety_violation:
+        #     print("K-safety violation detected!")
+        #     print("Transitions in combination:", combination)
+        #     print("Successor markings in combination:", combination_successor_markings)
 
         for transition in enabled_transitions:
             successor_markings = petri_net.execute_transition(transition, current_markings)
@@ -321,6 +321,12 @@ def find_paths(reachability_graph, start_marking, desired_marking):
     visited_markings.add(tuple(start_marking.items()))
     backtrack([], start_marking, visited_markings)
     return paths
+
+def generate_program_sketch(transition, num_parameters):
+    # Implement the logic to generate the program sketch based on the transition and parameters
+    parameters = [f"x_{i+1}" for i in range(num_parameters)]
+    program_sketch = f"{transition}({', '.join(parameters)})"
+    return program_sketch
 
 def pretty_print_edges(edges):
     print("Edges: ")
@@ -664,6 +670,15 @@ def test_find_paths():
     assert len(paths) == 3
     assert paths == [['Multiplication'], ['Addition'], ['Subtraction']]
 
+    program_sketches = []
+    for candidate_transitions in paths:
+        current_sketch = []
+        for transition in candidate_transitions:
+            program_sketch = generate_program_sketch(transition, 2)
+            current_sketch.append(program_sketch)
+        program_sketches.append(current_sketch)
+    print("Program sketches: ", program_sketches)
+
     # Create a Petri net
     petri_net = PetriNet()
 
@@ -702,7 +717,15 @@ def test_find_paths():
     print("Paths: ", paths)
     assert len(paths) == 1
     assert paths == [["createTransShape"]]
-
+    
+    program_sketches = []
+    for candidate_transitions in paths:
+        current_sketch = []
+        for transition in candidate_transitions:
+            program_sketch = generate_program_sketch(transition, 1)
+            current_sketch.append(program_sketch)
+        program_sketches.append(current_sketch)
+    print("Program sketches: ", program_sketches)
 
     # Create a Petri net
     petri_net = PetriNet()
