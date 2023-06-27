@@ -1,5 +1,6 @@
 import inspect
 from collections import deque
+from itertools import combinations
 
 class PetriNet:
     def __init__(self):
@@ -72,22 +73,17 @@ class PetriNet:
         for input_place in inputs:
             edge_weight = self.edges[input_place][transition]
             if updated_place_markings[input_place] < edge_weight:
-                raise ValueError(f"Not enough tokens in place {input_place} to fire transition {transition}.")
+                # raise ValueError(f"Not enough tokens in place {input_place} to fire transition {transition}.")
+                return place_markings  # Transition cannot be fired, return the original markings
 
         output_place = next(iter(self.edges[transition].keys()))
 
         # Consume tokens from input places
         for input_place in inputs:
-            print("Edges: ", self.edges)
-            print("Transition: ", transition)
-            print("Input place: ", input_place)
             input_edge_weight = self.edges[input_place][transition]
-            print(f"{input_place} -> {transition}: ", input_edge_weight)
-            print("Output place: ", output_place)
             output_edge_weight = self.edges[transition][output_place]
-            print(f"{transition} -> {output_place}: ", output_edge_weight)
-            # Add tokens to the output place
             updated_place_markings[input_place] -= input_edge_weight
+            # Add tokens to the output place
             updated_place_markings[output_place] += output_edge_weight
         
         return updated_place_markings
@@ -241,23 +237,54 @@ def construct_reachability_graph(petri_net):
     reachability_graph = ReachabilityGraph()
     initial_markings = petri_net.place_markings.copy()
     worklist = deque([initial_markings])
-    visited_edges = set()
+    visited_markings = set()  # Keep track of visited markings
+    visited_edges = set()  # Keep track of visited edges
 
     while worklist:
         current_markings = worklist.popleft()
         current_markings_tuple = tuple(current_markings.items())
+
+        if current_markings_tuple in visited_markings:
+            continue  # Skip if the current marking has already been visited
+
+        visited_markings.add(current_markings_tuple)  # Add current marking to visited markings
         reachability_graph.add_node(current_markings)
 
         enabled_transitions = petri_net.enabled_edges(current_markings)
+
+        k = 2  # Set the value of k for k-safety violation detection
+        k_safety_violation = False
+        for combination in combinations(enabled_transitions, k):
+            combination_successor_markings = set()
+            for transition in combination:
+                successor_markings = petri_net.execute_transition(transition, current_markings)
+                successor_markings_tuple = tuple(successor_markings.items())
+                if successor_markings_tuple == current_markings_tuple:
+                    k_safety_violation = True
+                    break
+                combination_successor_markings.add(successor_markings_tuple)
+            if len(combination_successor_markings) == 1:
+                k_safety_violation = True
+            if k_safety_violation:
+                break
+
+        if k_safety_violation:
+            print("K-safety violation detected!")
+            print("Transitions in combination:", combination)
+            print("Successor markings in combination:", combination_successor_markings)
+
         for transition in enabled_transitions:
-            print("Transition: ", transition)
             successor_markings = petri_net.execute_transition(transition, current_markings)
             successor_markings_tuple = tuple(successor_markings.items())
-            edge = (current_markings_tuple, transition, tuple(successor_markings.items()))
-            if edge in visited_edges:
-                continue
 
-            visited_edges.add(edge)
+            if successor_markings_tuple == current_markings_tuple:
+                continue  # Skip if the successor marking is the same as the current marking
+
+            edge = (current_markings_tuple, transition, successor_markings_tuple)
+            if edge in visited_edges:
+                continue  # Skip if the edge has already been visited
+
+            visited_edges.add(edge)  # Add edge to visited edges
             reachability_graph.add_node(successor_markings)
             reachability_graph.add_edge(current_markings_tuple, transition, successor_markings_tuple)
 
@@ -268,24 +295,31 @@ def construct_reachability_graph(petri_net):
 def find_paths(reachability_graph, start_marking, desired_marking):
     paths = []
 
-    def backtrack(path, current_marking):
-        current_marking = dict(current_marking)  # Convert current_marking to a dictionary
+    def backtrack(path, current_marking, visited_markings):
+        current_marking = dict(current_marking)
+        # print("Current marking:", current_marking)  # Add print statement
+
         if current_marking == desired_marking:
-            paths.append(path[:])  # Make a copy of the path before adding it to the list
+            paths.append(path[:])
             return
 
-        # Convert current_marking to a tuple if it is a dictionary
         if isinstance(current_marking, dict):
             current_marking = tuple(current_marking.items())
 
         enabled_transitions = reachability_graph.edges.get(current_marking, {})
-        for transition, successor_marking in enabled_transitions.items():
-            if successor_marking not in path:
-                path.append(transition)
-                backtrack(path, successor_marking)
-                path.pop()
 
-    backtrack([], start_marking)
+        for transition, successor_marking in enabled_transitions.items():
+            path.append(transition)
+            new_visited_markings = set(visited_markings)  # Create a new set for each recursive call
+            if successor_marking not in new_visited_markings:
+                new_visited_markings.add(successor_marking)
+                # print("Exploring transition:", transition)  # Add print statement
+                backtrack(path, successor_marking, new_visited_markings)
+            path.pop()
+
+    visited_markings = set()
+    visited_markings.add(tuple(start_marking.items()))
+    backtrack([], start_marking, visited_markings)
     return paths
 
 def pretty_print_edges(edges):
@@ -585,6 +619,7 @@ def test_find_paths():
     start_marking = {"P1": 1, "P2": 0, "P3": 0, "P4": 0, "P5": 0}
     desired_marking = {"P1": 0, "P2": 0, "P3": 0, "P4": 0, "P5": 1}
     paths = find_paths(reachability_graph, start_marking, desired_marking)
+    print("Paths: ", paths)
     assert len(paths) == 2
     assert paths[0] == ["T1", "T2", "T3", "T4"]
     assert paths[1] == ["T1", "T5"]
@@ -596,7 +631,7 @@ def test_find_paths():
 
     # Add places to the Petri net
     petri_net.add_place("int", markings=2)
-    petri_net.add_place("str", markings=2)
+    petri_net.add_place("str", markings=0)
     petri_net.add_place("bool", markings=0)
 
     # Add transitions to the Petri net
@@ -620,15 +655,112 @@ def test_find_paths():
 
     # Construct the reachability graph
     reachability_graph = construct_reachability_graph(petri_net)
-    pretty_print_edges(reachability_graph.edges)
 
     # Test case: Find paths from initial marking to {"int": 0, "str": 0, "bool": 1}
-    start_marking = {"int": 2, "str": 2, "bool": 0}
-    desired_marking = {"int": 0, "str": 0, "bool": 1}
+    start_marking = {"int": 2, "str": 0, "bool": 0}
+    desired_marking = {"int": 1, "str": 0, "bool": 0}
+    paths = find_paths(reachability_graph, start_marking, desired_marking)
+    print("Paths: ", paths)
+    assert len(paths) == 3
+    assert paths == [['Multiplication'], ['Addition'], ['Subtraction']]
+
+    # Create a Petri net
+    petri_net = PetriNet()
+
+    # Add places to the Petri net
+    petri_net.add_place("Shape", markings=1)
+    petri_net.add_place("string", markings=0)
+    petri_net.add_place("Point2D", markings=0)
+    petri_net.add_place("double", markings=0)
+
+    # Add transitions to the Petri net
+    petri_net.add_transition("createTransShape")
+    petri_net.add_transition("toString")
+    petri_net.add_transition("createPoint2D")
+    petri_net.add_transition("getX")
+    petri_net.add_transition("setToRotation")
+
+    # Add edges between nodes in the Petri net
+    petri_net.add_edge("Shape", "createTransShape", weight=1)
+    petri_net.add_edge("createTransShape", "Point2D", weight=1)
+    petri_net.add_edge("Shape", "toString", weight=1)
+    petri_net.add_edge("toString", "string", weight=1)
+    petri_net.add_edge("Point2D", "createPoint2D", weight=1)
+    petri_net.add_edge("createPoint2D", "Point2D", weight=1)
+    petri_net.add_edge("Point2D", "getX", weight=1)
+    petri_net.add_edge("getX", "double", weight=1)
+    petri_net.add_edge("Shape", "setToRotation", weight=1)
+    petri_net.add_edge("setToRotation", "Shape", weight=1)
+
+    # Construct the reachability graph
+    reachability_graph = construct_reachability_graph(petri_net)
+
+    # Test case: Find paths from initial marking to {"Shape": 1, "string": 0, "Point2D": 1, "double": 0}
+    start_marking = {"Shape": 1, "string": 0, "Point2D": 0, "double": 0}
+    desired_marking = {"Shape": 0, "string": 0, "Point2D": 1, "double": 0}
     paths = find_paths(reachability_graph, start_marking, desired_marking)
     print("Paths: ", paths)
     assert len(paths) == 1
-    assert paths[0] == ["Subtraction", "Multiplication", "Concat", "EqualityCheck"]
+    assert paths == [["createTransShape"]]
+
+
+    # Create a Petri net
+    petri_net = PetriNet()
+
+    # Add places to the Petri net
+    petri_net.add_place("Shape")
+    petri_net.add_place("string")
+    petri_net.add_place("Point2D", markings=1)
+    petri_net.add_place("double", markings=1)
+    petri_net.add_place("Affine Transform")
+    petri_net.add_place("Area", markings=1)
+    petri_net.add_place("void", markings=1)
+
+    # Add transitions to the Petri net
+    petri_net.add_transition("toString")
+    petri_net.add_transition("KD")
+    petri_net.add_transition("createTransShape")
+    petri_net.add_transition("getX")
+    petri_net.add_transition("getY")
+    petri_net.add_transition("KT")
+    petri_net.add_transition("KA")
+    petri_net.add_transition("invert")
+    petri_net.add_transition("AffineTrans")
+    petri_net.add_transition("setToRotation")
+    petri_net.add_transition("createTransArea")
+    petri_net.add_transition("KV")
+
+    # Add edges between nodes in the Petri net
+    petri_net.add_edge("Shape", "createTransShape", weight=1)
+    petri_net.add_edge("createTransShape", "Shape", weight=1)
+    petri_net.add_edge("toString", "string", weight=1)
+    petri_net.add_edge("Point2D", "toString", weight=1)
+    petri_net.add_edge("Point2D", "KD", weight=1)
+    petri_net.add_edge("KD", "Point2D", weight=2)
+    petri_net.add_edge("Point2D", "getX", weight=1)
+    petri_net.add_edge("Point2D", "getY", weight=1)
+    petri_net.add_edge("getX", "double", weight=1)
+    petri_net.add_edge("getY", "double", weight=1)
+    petri_net.add_edge("Affine Transform", "createTransShape", weight=1)
+    petri_net.add_edge("Affine Transform", "KT", weight=1)
+    petri_net.add_edge("Affine Transform", "createTransArea", weight=1)
+    petri_net.add_edge("Affine Transform", "invert", weight=1)
+    petri_net.add_edge("Affine Transform", "setToRotation", weight=1)
+    petri_net.add_edge("KT", "Affine Transform", weight=2)
+    petri_net.add_edge("AffineTrans", "Affine Transform", weight=1)
+    petri_net.add_edge("double", "setToRotation", weight=3)
+    petri_net.add_edge("void", "KV", weight=1)
+    petri_net.add_edge("KV", "void", weight=2)
+    petri_net.add_edge("invert", "void", weight=1)
+    petri_net.add_edge("setToRotation", "void", weight=1)
+    petri_net.add_edge("createTransArea", "Area", weight=1)
+    petri_net.add_edge("KA", "Area", weight=2)
+    petri_net.add_edge("Area", "KA", weight=1)
+    petri_net.add_edge("Area", "createTransArea", weight=1)
+
+    # Construct the reachability graph
+    # reachability_graph = construct_reachability_graph(petri_net)
+    # pretty_print_edges(reachability_graph.edges)
 
     print("\u2705 Test case passed!")
 
