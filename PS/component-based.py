@@ -268,10 +268,11 @@ def construct_reachability_graph(petri_net):
             if k_safety_violation:
                 break
 
-        # if k_safety_violation:
-        #     print("K-safety violation detected!")
-        #     print("Transitions in combination:", combination)
-        #     print("Successor markings in combination:", combination_successor_markings)
+        if k_safety_violation:
+            print("K-safety violation detected!")
+            print("Transitions in combination:", combination)
+            print("Successor markings in combination:", combination_successor_markings)
+            # return
 
         for transition in enabled_transitions:
             successor_markings = petri_net.execute_transition(transition, current_markings)
@@ -291,6 +292,18 @@ def construct_reachability_graph(petri_net):
             worklist.append(successor_markings)
 
     return reachability_graph
+
+class Ant:
+    def __init__(self):
+        self.markings = {}
+        self.path = []
+
+    def update_current_marking(self, node, pheromone_amount):
+        self.markings[node] = pheromone_amount
+
+    def add_transition_to_path(self, transition):
+        self.path.append(transition)
+
 
 def find_paths(reachability_graph, start_marking, desired_marking):
     paths = []
@@ -452,7 +465,6 @@ def test_enabled_edges():
     petri_net.add_transition("T1")
     petri_net.add_transition("T2")
     petri_net.add_transition("T3")
-
 
     # Add edges
     petri_net.add_edge("P1", "T1", weight=2)
@@ -780,6 +792,24 @@ def test_find_paths():
     petri_net.add_edge("KA", "Area", weight=2)
     petri_net.add_edge("Area", "KA", weight=1)
     petri_net.add_edge("Area", "createTransArea", weight=1)
+
+    # Identify violations. 
+    k = 4  # Maximum allowed tokens in a place
+
+    # Step 1: Identify k-safety violations
+    violating_transitions = []
+    for transition in petri_net.transitions:
+        print("Checking: ", transition)
+        temp_marking = petri_net.place_markings.copy()  # Make a copy of the current marking
+        updated_markings = petri_net.execute_transition(transition, temp_marking)  # Simulate firing the transition
+        print("Updated markings: ", updated_markings)
+        sum_of_markings = sum(updated_markings.values())
+        if sum_of_markings > k:
+            violating_transitions.append(transition)
+
+    # Step 2: Remove violating transitions/edges
+    for transition in violating_transitions:
+        print("Violating transition: ", transition)
 
     # Construct the reachability graph
     # reachability_graph = construct_reachability_graph(petri_net)
