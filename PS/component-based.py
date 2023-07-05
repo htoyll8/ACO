@@ -252,28 +252,6 @@ def construct_reachability_graph(petri_net):
 
         enabled_transitions = petri_net.enabled_edges(current_markings)
 
-        k = 2  # Set the value of k for k-safety violation detection
-        k_safety_violation = False
-        for combination in combinations(enabled_transitions, k):
-            combination_successor_markings = set()
-            for transition in combination:
-                successor_markings = petri_net.execute_transition(transition, current_markings)
-                successor_markings_tuple = tuple(successor_markings.items())
-                if successor_markings_tuple == current_markings_tuple:
-                    k_safety_violation = True
-                    break
-                combination_successor_markings.add(successor_markings_tuple)
-            if len(combination_successor_markings) == 1:
-                k_safety_violation = True
-            if k_safety_violation:
-                break
-
-        if k_safety_violation:
-            print("K-safety violation detected!")
-            print("Transitions in combination:", combination)
-            print("Successor markings in combination:", combination_successor_markings)
-            # return
-
         for transition in enabled_transitions:
             successor_markings = petri_net.execute_transition(transition, current_markings)
             successor_markings_tuple = tuple(successor_markings.items())
