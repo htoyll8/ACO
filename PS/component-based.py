@@ -1,4 +1,5 @@
 import inspect
+import random
 from collections import deque
 from itertools import combinations
 
@@ -265,6 +266,7 @@ def construct_reachability_graph(petri_net):
 
             visited_edges.add(edge)  # Add edge to visited edges
             reachability_graph.add_node(successor_markings)
+            print("Current marking: ", current_markings_tuple, "Succesor markings: ", successor_markings_tuple)
             reachability_graph.add_edge(current_markings_tuple, transition, successor_markings_tuple)
 
             worklist.append(successor_markings)
@@ -272,23 +274,134 @@ def construct_reachability_graph(petri_net):
     return reachability_graph
 
 class Ant:
-    def __init__(self):
-        self.markings = {}
+    def __init__(self, start_marking):
+        self.current_marking = start_marking
         self.path = []
-
-    def update_current_marking(self, node, pheromone_amount):
-        self.markings[node] = pheromone_amount
-
+    
+    def update_current_marking(self, marking):
+        if isinstance(marking, tuple):
+            self.current_marking = dict(marking)
+        else:
+            self.current_marking = marking
+    
     def add_transition_to_path(self, transition):
         self.path.append(transition)
 
+def ant_colony_optimization(reachability_graph, start_marking, desired_marking, num_ants=10, num_iterations=100, alpha=1.0, beta=2.0, evaporation_rate=0.5):
+    pheromone = initialize_pheromone(reachability_graph)  # Initialize pheromone matrix
+    best_path = None
+    best_path_length = float('inf')
+    
+    for _ in range(num_iterations):
+        paths = []
+        
+        # Construct paths for all ants
+        for _ in range(num_ants):
+            ant = Ant(start_marking)
+            print("Pheromone upper parameter: ", pheromone)
+            construct_path(reachability_graph, ant, pheromone, desired_marking, alpha, beta)
+            paths.append(ant.path)
+
+            if not best_path:
+                best_path = ant.path
+                best_path_length = len(ant.path)
+                best_marking = ant.current_marking
+
+            if hamming_distance(ant.current_marking, desired_marking) < hamming_distance(best_marking, desired_marking) or (ant.path and len(ant.path) < best_path_length):
+                print("Best path intermediate:", best_path)
+                best_path = ant.path
+                best_path_length = len(ant.path)
+                best_marking = ant.current_marking
+        
+        # Update pheromone matrix
+        pheromone = update_pheromone(pheromone, paths, evaporation_rate)
+    
+    return best_path
+
+def initialize_pheromone(reachability_graph):
+    pheromone = {}
+    print("Edges: ", reachability_graph.edges)
+    for source in reachability_graph.nodes:
+        print("Source: ", source)
+        for transition in reachability_graph.edges[source]:
+            pheromone[transition] = 1.0
+    print("Pheremone: ", pheromone)
+    return pheromone
+
+def construct_path(reachability_graph, ant, pheromone, desired_marking, alpha, beta):
+    while ant.current_marking != desired_marking:
+        print("MARKING: ", ant.current_marking)
+        current_marking_tuple = tuple(ant.current_marking.items())
+        enabled_transitions = reachability_graph.edges[current_marking_tuple]
+        probabilities = calculate_transition_probabilities(enabled_transitions, pheromone, alpha, beta)
+        transition = select_transition(probabilities)
+        print("Selected transition: ", transition)
+        
+        if transition is None:
+            break
+        
+        successor_marking = reachability_graph.edges[current_marking_tuple][transition]
+        ant.add_transition_to_path(transition)
+        ant.update_current_marking(successor_marking)
+
+def hamming_distance(marking1, marking2):
+    distance = 0
+    for place in marking1:
+        if marking1[place] != marking2[place]:
+            distance += 1
+    return distance
+
+def calculate_transition_probabilities(enabled_transitions, pheromone, alpha, beta):
+    total_pheromone = 0.0
+    probabilities = {}
+
+    print("Pheromone: ", pheromone)
+    for transition, weight in pheromone.items():
+        total_pheromone += weight ** alpha
+
+    print("Enabled transitions: ", enabled_transitions)
+    for transition in enabled_transitions:
+        probability = (pheromone[transition] ** alpha) / total_pheromone
+        probabilities[transition] = probability
+
+    print("Total pheromone: ", total_pheromone)
+    print("Probabilities: ", probabilities)
+    return probabilities
+
+def select_transition(probabilities):
+    random_value = random.random()
+    print("Random value: ", random_value)
+    cumulative_probability = 0.0
+    for transition, probability in probabilities.items():
+        cumulative_probability += probability
+        if random_value <= cumulative_probability:
+            return transition
+    return None
+
+def update_pheromone(pheromone, paths, evaporation_rate):
+    print("Paths: ", paths)
+    print("Evaporation rate: ", evaporation_rate)
+    print("Pheromone: ", pheromone)
+
+    # Evaporate pheromone on all transitions
+    for transition in pheromone:
+        pheromone[transition] *= (1.0 - evaporation_rate)  # Evaporate pheromone on each transition
+
+    # Deposit pheromone on the transitions in the paths
+    for path in paths:
+        path_length = len(path)
+        for i in range(path_length - 1):
+            transition = path[i]  # Assuming transitions are used as path elements
+            if transition in pheromone:
+                pheromone[transition] += 1.0 / path_length  # Deposit pheromone on the transition
+
+    return pheromone
 
 def find_paths(reachability_graph, start_marking, desired_marking):
     paths = []
 
     def backtrack(path, current_marking, visited_markings):
         current_marking = dict(current_marking)
-        # print("Current marking:", current_marking)  # Add print statement
 
         if current_marking == desired_marking:
             paths.append(path[:])
@@ -699,6 +812,7 @@ def test_find_paths():
 
     # Construct the reachability graph
     reachability_graph = construct_reachability_graph(petri_net)
+    print("Edges: ", reachability_graph.edges)
 
     # Test case: Find paths from initial marking to {"Shape": 1, "string": 0, "Point2D": 1, "double": 0}
     start_marking = {"Shape": 1, "string": 0, "Point2D": 0, "double": 0}
@@ -777,10 +891,8 @@ def test_find_paths():
     # Step 1: Identify k-safety violations
     violating_transitions = []
     for transition in petri_net.transitions:
-        print("Checking: ", transition)
         temp_marking = petri_net.place_markings.copy()  # Make a copy of the current marking
         updated_markings = petri_net.execute_transition(transition, temp_marking)  # Simulate firing the transition
-        print("Updated markings: ", updated_markings)
         sum_of_markings = sum(updated_markings.values())
         if sum_of_markings > k:
             violating_transitions.append(transition)
@@ -795,6 +907,28 @@ def test_find_paths():
 
     print("\u2705 Test case passed!")
 
+def test_ant_colony_optimization():
+    # Test Case 1: Simple reachability graph
+    reachability_graph = ReachabilityGraph()
+    reachability_graph.add_node({'A': 0, 'B': 0, 'C': 0})
+    reachability_graph.add_node({'A': 1, 'B': 0, 'C': 0})
+    reachability_graph.add_node({'A': 1, 'B': 1, 'C': 0})
+
+    reachability_graph.add_edge(tuple({'A': 0, 'B': 0, 'C': 0}.items()), 'transition1', (('A', 1), ('B', 0), ('C', 0)))
+    reachability_graph.add_edge(tuple({'A': 1, 'B': 0, 'C': 0}.items()), 'transition2', (('A', 1), ('B', 1), ('C', 0)))
+    reachability_graph.add_edge(tuple({'A': 1, 'B': 1, 'C': 0}.items()), 'transition3', (('A', 0), ('B', 1), ('C', 0)))
+
+    start_marking = {'A': 0, 'B': 0, 'C': 0}
+    desired_marking = {'A': 1, 'B': 1, 'C': 0}
+    num_ants = 5
+    num_iterations = 10
+    alpha = 1.0
+    beta = 2.0
+    evaporation_rate = 0.5
+
+    best_path = ant_colony_optimization(reachability_graph, start_marking, desired_marking, num_ants, num_iterations, alpha, beta, evaporation_rate)
+    print(f"Best path: {best_path}")  # Expected output: ['transition1', 'transition2']
+
 # Run the test function
 test_execute_transition()
 test_construct_petri()
@@ -803,3 +937,4 @@ test_get_outputs()
 test_enabled_edges()
 test_construct_reachability_graph()
 test_find_paths()
+test_ant_colony_optimization()
